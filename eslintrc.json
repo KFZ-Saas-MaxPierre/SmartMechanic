@@ -1,0 +1,35 @@
+import { prisma } from "@/lib/db";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Table, Th, Td, EmptyState } from "@/components/ui/Table";
+
+export default async function WorkTypesPage() {
+  const workTypes = await prisma.workType.findMany({ orderBy: { name: "asc" } });
+
+  return (
+    <div>
+      <PageHeader
+        title="Arbeitsarten"
+        description="Konfigurierbare Arbeitsarten mit Standarddauer (z. B. Ölwechsel, Bremsen, Service, Pickerl)."
+      />
+      <Table>
+        <thead>
+          <tr>
+            <Th>Name</Th>
+            <Th>Dauer</Th>
+            <Th>Hebebühne nötig</Th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {workTypes.map((workType) => (
+            <tr key={workType.id}>
+              <Td>{workType.name}</Td>
+              <Td>{workType.durationMinutes} Min.</Td>
+              <Td>{workType.requiresLift ? "Ja" : "Nein"}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      {workTypes.length === 0 && <EmptyState label="Noch keine Arbeitsarten angelegt." />}
+    </div>
+  );
+}
