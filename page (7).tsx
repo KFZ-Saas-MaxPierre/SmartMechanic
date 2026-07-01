@@ -4,13 +4,12 @@ import { prisma } from "@/lib/db";
 
 const createSchema = z.object({
   name: z.string().min(1),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
+  active: z.boolean().optional(),
 });
 
 export async function GET() {
-  const customers = await prisma.customer.findMany({ orderBy: { name: "asc" } });
-  return NextResponse.json({ customers });
+  const lifts = await prisma.lift.findMany({ orderBy: { name: "asc" } });
+  return NextResponse.json({ lifts });
 }
 
 export async function POST(request: NextRequest) {
@@ -24,6 +23,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const customer = await prisma.customer.create({ data: parsed.data });
-  return NextResponse.json({ customer }, { status: 201 });
+  const lift = await prisma.lift.create({ data: parsed.data });
+  return NextResponse.json({ lift }, { status: 201 });
 }

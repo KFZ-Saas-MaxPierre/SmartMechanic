@@ -1,1 +1,6 @@
-# SmartMechanic
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};

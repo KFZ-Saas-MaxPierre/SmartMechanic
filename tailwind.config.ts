@@ -1,153 +1,98 @@
-"use client";
+# Werkstattlotse
 
-import { useState } from "react";
+Intelligente Terminplanung für KFZ-Reparaturwerkstätten. Berücksichtigt
+Mechaniker-Verfügbarkeit, Hebebühnen und Arbeitsdauer automatisch bei der
+Terminvergabe – siehe den vollständigen fachlichen Hintergrund im
+Obsidian-Vault, Dokument **"Werkstattlotse - Konzept & Fahrplan"**.
 
-interface WorkTypeOption {
-  id: string;
-  name: string;
-  durationMinutes: number;
-}
+## Wichtiger Hinweis zu diesem Stand
 
-interface Suggestion {
-  start: string;
-  end: string;
-  mechanicName: string;
-  liftName: string | null;
-}
+Dieses Projekt wurde von Claude in einer Cloud-Umgebung **ohne Zugriff auf
+das npm-Registry** geschrieben (Netzwerk-Policy blockiert `registry.npmjs.org`)
+und konnte deshalb **nicht** mit `npm install` / `npm run build` getestet
+werden. Der Code wurde stattdessen manuell sorgfältig geschrieben und alle
+TypeScript/TSX-Dateien wurden auf Syntaxfehler geprüft (23/23 Dateien ohne
+Syntaxfehler) – eine echte Typprüfung mit den tatsächlichen Paketversionen
+steht aber noch aus. **Bitte nach dem ersten `npm install` einmal
+`npm run build` laufen lassen** und kleinere Fehler (z. B. bei Typen) bei
+Bedarf selbst nachbessern oder mich in einer Session mit Repo-Zugriff
+korrigieren lassen.
 
-/**
- * Formular für die automatische Terminberechnung: Arbeitsart + Wunschzeitraum
- * rein, das System schlägt passende freie Termine vor (Mechaniker +
- * Hebebühne + Arbeitsdauer werden dabei automatisch berücksichtigt).
- *
- * Das ist die V1a-Basis für den USP. Die geplante KI-Spracheingabe (V1b,
- * "Golf 7, Ölwechsel und Pickerl nächste Woche") setzt später genau hier an:
- * sie würde workTypeId + desiredFrom/desiredTo automatisch aus einem Satz
- * ableiten und an dieselbe /api/appointments/suggest-Route übergeben.
- */
-export function AppointmentSuggestions({
-  workTypes,
-}: {
-  workTypes: WorkTypeOption[];
-}) {
-  const [workTypeId, setWorkTypeId] = useState(workTypes[0]?.id ?? "");
-  const [desiredFrom, setDesiredFrom] = useState("");
-  const [desiredTo, setDesiredTo] = useState("");
-  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+## Tech-Stack
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuggestions(null);
+- Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- Prisma ORM + PostgreSQL
+- Zod für Validierung
 
-    try {
-      const res = await fetch("/api/appointments/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workTypeId, desiredFrom, desiredTo }),
-      });
-      if (!res.ok) throw new Error("Vorschläge konnten nicht berechnet werden.");
-      const data = await res.json();
-      setSuggestions(data.suggestions);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unbekannter Fehler.");
-    } finally {
-      setLoading(false);
-    }
-  }
+## Setup
 
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
-      <h2 className="mb-4 text-base font-semibold text-gray-900">
-        Automatischen Termin vorschlagen lassen
-      </h2>
-      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-4 sm:items-end">
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-gray-500">
-            Arbeitsart
-          </label>
-          <select
-            value={workTypeId}
-            onChange={(e) => setWorkTypeId(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          >
-            {workTypes.map((wt) => (
-              <option key={wt.id} value={wt.id}>
-                {wt.name} ({wt.durationMinutes} Min.)
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Von</label>
-          <input
-            type="date"
-            value={desiredFrom}
-            onChange={(e) => setDesiredFrom(e.target.value)}
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Bis</label>
-          <input
-            type="date"
-            value={desiredTo}
-            onChange={(e) => setDesiredTo(e.target.value)}
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div className="sm:col-span-4">
-          <button
-            type="submit"
-            disabled={loading || !workTypeId}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            {loading ? "Berechne..." : "Termine vorschlagen"}
-          </button>
-        </div>
-      </form>
+```bash
+npm install
+cp .env.example .env
+# .env anpassen: DATABASE_URL auf eure Postgres-Instanz (z. B. Supabase) setzen
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+npx prisma migrate dev --name init
+npm run prisma:seed   # legt Beispieldaten an (2 Mechaniker, 2 Hebebühnen, 5 Arbeitsarten, 1 Testkunde)
 
-      {suggestions && (
-        <div className="mt-5">
-          {suggestions.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              Keine freien Termine im gewählten Zeitraum gefunden.
-            </p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {suggestions.map((s, i) => (
-                <li key={i} className="flex items-center justify-between py-2 text-sm">
-                  <span>
-                    {new Date(s.start).toLocaleString("de-AT", {
-                      weekday: "short",
-                      day: "2-digit",
-                      month: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    –{" "}
-                    {new Date(s.end).toLocaleTimeString("de-AT", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span className="text-gray-500">
-                    {s.mechanicName}
-                    {s.liftName ? ` · ${s.liftName}` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+npm run dev            # startet auf http://localhost:3000
+```
+
+## Projektstruktur
+
+```
+app/
+├── page.tsx                     # Startseite
+├── (dashboard)/                 # Bereich mit Navigation
+│   ├── calendar/                # Kalender + automatische Terminvorschläge (Kern-USP)
+│   ├── customers/                # Kundenverwaltung
+│   ├── vehicles/                 # Fahrzeugverwaltung
+│   ├── mechanics/                # Mechaniker + Arbeitszeiten
+│   ├── lifts/                    # Hebebühnen
+│   └── work-types/               # Arbeitsarten mit Standarddauer
+└── api/                          # API-Routen (CRUD + /appointments/suggest)
+components/                       # UI-Komponenten
+lib/
+├── db.ts                         # Prisma-Client
+└── scheduling.ts                 # Die automatische Terminlogik (Kern-USP)
+prisma/
+├── schema.prisma                 # Datenmodell
+└── seed.ts                       # Beispieldaten
+```
+
+## Was ist schon drin (V1a laut Vault-Konzept)
+
+- Kunden-, Fahrzeug-, Mechaniker-, Hebebühnen- und Arbeitsarten-Verwaltung (Listenansichten + API)
+- Werkstatt-Öffnungszeiten und Mechaniker-Wochenarbeitszeiten im Datenmodell
+- **Automatische Terminberechnung** (`lib/scheduling.ts`): Arbeitsart + Wunschzeitraum rein,
+  das System schlägt freie Termine vor, die Mechaniker-Verfügbarkeit, Hebebühnen-Verfügbarkeit
+  und Arbeitsdauer gleichzeitig berücksichtigen
+- Kalenderseite mit Formular für diese Vorschläge plus Liste der nächsten Termine
+- Konflikt-Check beim tatsächlichen Anlegen eines Termins (`POST /api/appointments`)
+
+## Was bewusst noch fehlt
+
+- **Login/Auth** – noch nicht implementiert (Supabase Auth oder Clerk laut Plan, siehe `.env.example`)
+- **UI zum Anlegen** von Kunden/Fahrzeugen/Mechanikern/Hebebühnen/Arbeitsarten (aktuell nur über die API bzw. den Seed-Datensatz, keine Formulare)
+- **UI, um einen Terminvorschlag tatsächlich zu bestätigen** (die Suggest-API liefert Vorschläge, das Bestätigen über `POST /api/appointments` ist als Route fertig, aber noch nicht an die Oberfläche angebunden)
+- **V1b – KI-Spracheingabe**: laut Vault-Konzept der nächste Schritt direkt nach diesem Kern. Ein Freitextfeld, aus dem ein Sprachmodell Fahrzeug + Arbeitsart + Zeitraum extrahiert und an dieselbe `/api/appointments/suggest`-Route übergibt. Bewusst noch nicht gebaut, siehe Backlog-Dokument im Vault.
+- Alles aus "Werkstattlotse - Ideen für spätere Versionen.md" im Vault (Online-Buchung, Erinnerungen, KI-Telefonassistent, ...)
+
+## Ins Repo einspielen (manuell, da ich hier keinen Repo-Zugriff hatte)
+
+Bestätigtes Ziel-Repo (Stand 2026-07-01, von Pierre bestätigt):
+**https://github.com/KFZ-Saas-MaxPierre/SmartMechanic**
+
+```bash
+git clone https://github.com/KFZ-Saas-MaxPierre/SmartMechanic.git
+# Inhalt dieses Ordners (werkstattlotse/) in den geklonten Ordner kopieren
+cd SmartMechanic
+git add .
+git commit -m "Initial scaffold: Werkstattlotse V1a (Next.js + Prisma)"
+git push origin main
+```
+
+## Danach
+
+Sobald das im Repo liegt und jemand mit GitHub-Zugriff (z. B. Maximilian in seiner
+eigenen Session) daran weiterarbeiten kann, sollte Vercel mit dem Repo verbunden
+werden, damit jeder Push automatisch eine Live-Vorschau erzeugt.

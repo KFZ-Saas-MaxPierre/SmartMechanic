@@ -4,13 +4,13 @@ import { prisma } from "@/lib/db";
 
 const createSchema = z.object({
   name: z.string().min(1),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
+  durationMinutes: z.number().int().positive(),
+  requiresLift: z.boolean().optional(),
 });
 
 export async function GET() {
-  const customers = await prisma.customer.findMany({ orderBy: { name: "asc" } });
-  return NextResponse.json({ customers });
+  const workTypes = await prisma.workType.findMany({ orderBy: { name: "asc" } });
+  return NextResponse.json({ workTypes });
 }
 
 export async function POST(request: NextRequest) {
@@ -24,6 +24,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const customer = await prisma.customer.create({ data: parsed.data });
-  return NextResponse.json({ customer }, { status: 201 });
+  const workType = await prisma.workType.create({ data: parsed.data });
+  return NextResponse.json({ workType }, { status: 201 });
 }
